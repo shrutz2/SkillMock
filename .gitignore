@@ -1,0 +1,36 @@
+# Secrets - never commit
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+env/
+*.egg-info/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+*.faiss
+
+# Node
+node_modules/
+build/
+dist/
+npm-debug.log*
+yarn-error.log*
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Agent/tooling
+.claude/
