@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+ai_mock.db
+venv/
+.venv/
+*.faiss
