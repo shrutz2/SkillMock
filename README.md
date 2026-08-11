@@ -8,6 +8,14 @@ Most mock-interview tools ask generic questions ("tell me about a time you solve
 a problem"). This one reads your resume first, so the questions are about the
 projects you actually built.
 
+## Demo
+
+![SkillMock AI walkthrough](docs/demo.gif)
+
+Upload a resume, read the ATS report, match it against a job description, then
+answer resume-specific questions and get scored. A sample resume to try it with
+is in [docs/sample_resume.pdf](docs/sample_resume.pdf).
+
 ## Stack
 
 - **Frontend:** React (Create React App), plain CSS

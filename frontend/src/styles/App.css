@@ -901,11 +901,14 @@ html, body {
   display: grid; place-items: center;
 }
 .fit-ring-inner {
-  width: 82px; height: 82px; border-radius: 999px; background: var(--white);
+  /* Opaque so the ring colour behind it never washes out the score text. */
+  width: 82px; height: 82px; border-radius: 999px; background: #fdfcf9;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   border: 1px solid var(--line);
 }
-.fit-ring-inner .score-big { font-size: 30px; }
+/* .score-big is cream for the navy results block; on the light ring it needs ink. */
+.fit-ring-inner .score-big { font-size: 30px; color: var(--ink); }
+.fit-ring-inner .score-unit { color: var(--ink-soft); }
 .fit-meta p { margin: 0 0 8px; font-size: 15px; }
 .fit-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
 @media (max-width: 520px) { .fit-top { flex-direction: column; text-align: center; } .fit-cols { grid-template-columns: 1fr; } }
