@@ -1,0 +1,7 @@
+# Optional: the sentence-transformers embedding backend.
+# Only needed if you set EMBEDDING_BACKEND=torch. Adds roughly 1.5 GB, so the
+# default onnx backend is the one used for deployment.
+#
+#   pip install -r requirements.txt -r requirements-torch.txt
+
+sentence-transformers==2.7.0

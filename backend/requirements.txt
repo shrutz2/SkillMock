@@ -2,8 +2,13 @@ Flask==3.0.3
 flask-cors==4.0.1
 python-dotenv==1.0.1
 PyPDF2==3.0.1
-sentence-transformers==2.7.0
-faiss-cpu==1.8.0
 numpy==1.26.4
+faiss-cpu==1.8.0
 mysql-connector-python==8.4.0
 requests==2.32.3
+gunicorn==22.0.0
+
+# Embeddings run locally through onnxruntime (all-MiniLM-L6-v2).
+# For the sentence-transformers/torch backend instead, see requirements-torch.txt
+# and set EMBEDDING_BACKEND=torch.
+fastembed==0.8.0

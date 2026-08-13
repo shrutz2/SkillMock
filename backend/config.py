@@ -23,6 +23,9 @@ class Config:
 
     # --- Embeddings ---
     EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+    # "onnx" (fastembed, ~50 MB) or "torch" (sentence-transformers, ~1.5 GB).
+    # Same model and identical vectors either way.
+    EMBEDDING_BACKEND = os.getenv("EMBEDDING_BACKEND", "onnx")
 
     # --- LLM ---
     # LLM_PROVIDER = "groq" | "gemini" | "mock"
