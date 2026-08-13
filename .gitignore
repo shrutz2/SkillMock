@@ -35,3 +35,6 @@ Thumbs.db
 # Agent/tooling
 .claude/
 docs/_frames/
+
+# Frontend build copied in at deploy time
+backend/static/
