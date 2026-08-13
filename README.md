@@ -8,6 +8,8 @@ Most mock-interview tools ask generic questions ("tell me about a time you solve
 a problem"). This one reads your resume first, so the questions are about the
 projects you actually built.
 
+**Live:** https://skillmock.onrender.com
+
 ## Demo
 
 ![SkillMock AI walkthrough](docs/demo.gif)
@@ -133,6 +135,5 @@ what the resume actually says.
 
 ## Roadmap
 
-- Live demo link
 - GitHub repo cross-referencing to check whether resume claims match real code
 - Multi-round interviews that build on previous answers
