@@ -20,7 +20,7 @@ is in [docs/sample_resume.pdf](docs/sample_resume.pdf).
 
 - **Frontend:** React (Create React App), plain CSS
 - **Backend:** Flask
-- **Embeddings:** sentence-transformers (`all-MiniLM-L6-v2`), runs locally
+- **Embeddings:** `all-MiniLM-L6-v2` running locally on onnxruntime (fastembed)
 - **Vector search:** FAISS
 - **LLM:** Groq / Gemini free tier (swappable, with an offline mock provider)
 - **Database:** MySQL (SQLite fallback for local runs)
@@ -119,8 +119,13 @@ across the document. It is also the pattern that matters at real scale.
 fine in-process, with no external service and no cost. A hosted vector DB or
 pgvector would be the upgrade at many concurrent users.
 
-**Why local embeddings?** No per-call cost and no data leaving the machine for
-the embedding step, which matters when the input is someone's resume.
+**Why local embeddings, and why ONNX?** Running the model locally means no
+per-call cost and no resume text leaving the machine for the embedding step.
+The first version used sentence-transformers, which pulls in torch and about
+1.5 GB of dependencies, too heavy for a small instance. Swapping to the same
+model on onnxruntime cut that to roughly 50 MB. The vectors are identical
+(cosine similarity 1.0), so it is a packaging change, not a quality tradeoff.
+The torch backend is still available via `EMBEDDING_BACKEND=torch`.
 
 **Known limitation.** Question quality depends on retrieval quality. If a
 retrieved section is short or generic, the generated question can drift away from
@@ -128,6 +133,6 @@ what the resume actually says.
 
 ## Roadmap
 
-- Deployment with a live demo link
+- Live demo link
 - GitHub repo cross-referencing to check whether resume claims match real code
 - Multi-round interviews that build on previous answers

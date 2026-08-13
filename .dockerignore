@@ -1,0 +1,14 @@
+.git
+.gitignore
+.claude
+docs/_frames
+**/node_modules
+**/build
+**/__pycache__
+**/*.pyc
+**/.env
+**/*.db
+**/venv
+**/.venv
+*.md
+!backend/requirements.txt
