@@ -56,7 +56,7 @@ class LLMClient:
         return self._mock(prompt)
 
     # --- Providers ----------------------------------------------------------
-    def _groq(self, prompt, attempts=3):
+    def _groq(self, prompt, attempts=5):
         # A 429 is a rate limit, not a failure - the free tier returns them
         # routinely under a burst. Without a retry every one of them dropped
         # straight to the mock, which looks like the model answering badly.
@@ -70,7 +70,7 @@ class LLMClient:
                 json={
                     "model": Config.GROQ_MODEL,
                     "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.4,
+                    "temperature": Config.LLM_TEMPERATURE,
                 },
                 timeout=30,
             )

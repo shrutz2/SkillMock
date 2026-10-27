@@ -12,12 +12,17 @@ fixed question would have forced every answer onto one topic, which only
 tests the scorer on one kind of writing - the same mistake the bullet
 calibration started with.
 """
+import os
 import time
+
+# Deterministic scoring, so a reported average is reproducible by anyone
+# re-running this. Must be set before Config is imported.
+os.environ.setdefault("LLM_TEMPERATURE", "0")
 
 from llm.client import client
 from services import evaluation_service as E
 
-DELAY_S = 2.5
+DELAY_S = float(os.getenv("CALIBRATE_DELAY_S", "6"))
 
 # Hand-labelled by one annotator, spread across backend, data, ML, security,
 # frontend and non-engineering work.

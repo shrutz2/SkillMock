@@ -3,13 +3,20 @@
 Run from the backend dir:  python calibrate.py
 Checks that clearly-strong bullets score >= 0.7 and clearly-weak bullets < 0.3.
 """
+import os
 import time
+
+# Deterministic scoring, so a reported average is reproducible by anyone
+# re-running this. Must be set before Config is imported.
+os.environ.setdefault("LLM_TEMPERATURE", "0")
 
 from services import analysis_service as A
 
-# Free-tier LLM APIs rate-limit bursts; pace the calls so the run reflects real
-# model scoring instead of falling back to the heuristic.
-DELAY_S = 2.5
+# Free-tier LLM APIs rate-limit bursts. At 2.5s a few calls still hit 429,
+# exhausted their retries and fell back to the heuristic, which shifted the
+# reported average between runs. Pace it slower: a number worth quoting has
+# to come from a run where every score reached the model.
+DELAY_S = float(os.getenv("CALIBRATE_DELAY_S", "6"))
 
 # Hand-labelled by one annotator. Deliberately spread across engineering,
 # data, and non-technical resumes - an earlier version was all backend SWE

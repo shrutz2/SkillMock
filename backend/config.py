@@ -36,6 +36,10 @@ class Config:
     # so a dead model id looks like a working app producing template output.
     # Check https://api.groq.com/openai/v1/models if generation goes generic.
     GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
+    # Calibration sets this to 0 so a reported score is reproducible. Leaving
+    # it at 0.4 there meant the measured averages drifted between runs, which
+    # is no use as a number anyone has to stand behind.
+    LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.4"))
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
