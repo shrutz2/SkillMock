@@ -115,17 +115,31 @@ def parsing_safety_score(resume_text, sections=None, parse_meta=None):
     add("Standard fonts used", fonts, "minor",
         "Standard, parser-safe fonts" if fonts else "Non-standard fonts may not map to text correctly")
 
-    # --- Weighted score: a critical failure caps the score below 80 ---
+    # --- Weighted score ---
+    # Points, not ratios. The old version divided by the number of checks, so
+    # the only reachable scores were 0/16/32/48/64/80/100 - a resume that
+    # parsed fine but used a non-listed font dropped from 100 straight to 80,
+    # which reads as broken rather than as a minor note.
+    #
+    # A critical failure still caps the result below 80, because an ATS that
+    # cannot read a section has a real problem no amount of polish offsets.
+    _CRITICAL_POINTS = 20
+    _MINOR_POINTS = 5
+    _CRITICAL_CAP = 79
+
     crit = [c for c in checks if c["weight"] == "critical"]
     minor = [c for c in checks if c["weight"] == "minor"]
-    crit_pass = sum(1 for c in crit if c["passed"])
-    if not crit:
+
+    possible = len(crit) * _CRITICAL_POINTS + len(minor) * _MINOR_POINTS
+    earned = (sum(_CRITICAL_POINTS for c in crit if c["passed"])
+              + sum(_MINOR_POINTS for c in minor if c["passed"]))
+
+    if not crit or not possible:
         score = 0
-    elif crit_pass < len(crit):
-        score = int((crit_pass / len(crit)) * 80)
     else:
-        minor_pass = sum(1 for c in minor if c["passed"])
-        score = 80 + int((minor_pass / max(len(minor), 1)) * 20)
+        score = int(round((earned / possible) * 100))
+        if any(not c["passed"] for c in crit):
+            score = min(score, _CRITICAL_CAP)
 
     return {
         "score": score,

@@ -12,6 +12,13 @@ _STANDARD_FONTS = (
     "arial", "helvetica", "times", "timesnewroman", "calibri", "cambria",
     "georgia", "garamond", "verdana", "tahoma", "trebuchet", "courier",
     "bookantiqua", "palatino", "lato", "roboto", "opensans", "segoeui",
+    # LaTeX defaults - extremely common on engineering resumes.
+    "latinmodern", "lmroman", "lmsans", "cmr", "computermodern", "charter",
+    # Widely used UI/Google fonts that extract cleanly.
+    "inter", "montserrat", "poppins", "sourcesans", "sourceserif", "notosans",
+    "nunito", "raleway", "merriweather", "ptsans", "ptserif", "firasans",
+    "ibmplexsans", "ibmplexserif", "worksans", "rubik", "karla", "mulish",
+    "dejavu", "liberation", "nimbus", "jostpoppins", "publicsans",
 )
 
 # "  12  Built a service..." / "12\tBuilt..." / "12 | Built..."
@@ -73,7 +80,12 @@ def _fonts_are_standard(reader):
         return None
     norm = [re.sub(r"^/?[A-Z]{6}\+", "", n).replace("/", "").replace("-", "").replace(" ", "").lower()
             for n in names]
-    return all(any(std in n for std in _STANDARD_FONTS) for n in norm)
+    # Requiring EVERY font to be on the list failed any resume built in LaTeX
+    # (Latin Modern) or with a modern UI font, even though its text extracted
+    # perfectly. Judge the body instead: if most fonts are parser-safe, the
+    # document is parser-safe.
+    known = sum(1 for n in norm if any(std in n for std in _STANDARD_FONTS))
+    return (known / len(norm)) >= 0.5
 
 
 def _has_images(reader):
@@ -93,12 +105,63 @@ def _has_images(reader):
         return None
 
 
+_YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
+_MONTH_WORD = re.compile(
+    r"\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b", re.I
+)
+_TENURE_WORD = re.compile(r"\b(?:present|current|ongoing|remote|hybrid|on-?site)\b", re.I)
+
+
+def _is_right_aligned_tail(s):
+    """True when the text after a wide gap is a when/where, not a second column.
+
+    The standard single-column resume right-aligns a date range, a year, or a
+    city against the role on the left - "Backend Engineer     Aug 2023 - Present".
+    A real second column instead carries prose or a skills list there.
+
+    A regex over date formats turned out to be the wrong tool: it kept missing
+    common shapes like "Jan 2025 - Jun 2025 | Pune". Two cheap properties
+    separate the cases reliably - a tail is SHORT, and it mentions a date.
+    """
+    if len(s) > 44 or len(s.split()) > 7:
+        return False
+    return bool(_YEAR.search(s) or _MONTH_WORD.search(s) or _TENURE_WORD.search(s))
+
+
 def _looks_multi_column(text):
-    """Two-column layouts leave wide internal gaps on many lines."""
-    lines = [ln for ln in (text or "").splitlines() if len(ln.strip()) > 25]
+    """Detect a genuine two-column layout.
+
+    The naive test - "a wide gap on many lines" - fires on the most common
+    resume format there is, where the role sits left and the date or city is
+    right-aligned with spaces. That is single-column text and an ATS reads it
+    fine, so counting it as a column failure penalises good resumes.
+
+    A real second column instead leaves substantive text on BOTH sides of the
+    gap, line after line. So a gap only counts when the right-hand side is long
+    enough to be prose and does not look like a right-aligned date or place.
+    """
+    lines = [ln.rstrip() for ln in (text or "").splitlines() if len(ln.strip()) > 25]
     if len(lines) < 8:
         return False
-    gapped = sum(1 for ln in lines if re.search(r"\S {5,}\S", ln))
+
+    gapped = 0
+    for ln in lines:
+        # extract_text() collapses runs of 4+ spaces down to exactly 3, so the
+        # threshold has to be 3 here. At 5 this check could never fire on real
+        # extracted text and the column test was silently dead.
+        m = re.search(r"\S {3,}(\S.*)$", ln)
+        if not m:
+            continue
+        left = ln[:m.start(1)].strip()
+        right = m.group(1).strip()
+        # Both sides must carry real content, and the right side must not be
+        # the usual right-aligned date / location tail.
+        if len(left) < 15 or len(right) < 24:
+            continue
+        if _is_right_aligned_tail(right):
+            continue
+        gapped += 1
+
     return gapped / len(lines) > 0.35
 
 
