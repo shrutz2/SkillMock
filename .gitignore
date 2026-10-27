@@ -38,3 +38,7 @@ docs/_frames/
 
 # Frontend build copied in at deploy time
 backend/static/
+
+# Personal / local-only
+_r.txt
+docs/prep/
