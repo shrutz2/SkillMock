@@ -1,0 +1,6 @@
+# Keep binaries byte-exact; git was guessing these were text and
+# rewriting line endings, which corrupts them.
+*.pdf binary
+*.png binary
+*.gif binary
+*.jpg binary

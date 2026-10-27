@@ -112,8 +112,9 @@ def parsing_safety_score(resume_text, sections=None, parse_meta=None):
         else "Text appears to be inside an image - ATS cannot read it")
 
     fonts = meta.get("font_is_standard")
-    add("Standard fonts used", fonts, "minor",
-        "Standard, parser-safe fonts" if fonts else "Non-standard fonts may not map to text correctly")
+    add("Fonts map to readable text", fonts, "minor",
+        "Every font resolves to characters" if fonts
+        else "A font carries no character map - extracted text may come out garbled")
 
     # --- Weighted score ---
     # Points, not ratios. The old version divided by the number of checks, so

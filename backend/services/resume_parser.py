@@ -8,17 +8,10 @@ import re
 import PyPDF2
 
 # Fonts ATS parsers handle reliably.
-_STANDARD_FONTS = (
-    "arial", "helvetica", "times", "timesnewroman", "calibri", "cambria",
-    "georgia", "garamond", "verdana", "tahoma", "trebuchet", "courier",
-    "bookantiqua", "palatino", "lato", "roboto", "opensans", "segoeui",
-    # LaTeX defaults - extremely common on engineering resumes.
-    "latinmodern", "lmroman", "lmsans", "cmr", "computermodern", "charter",
-    # Widely used UI/Google fonts that extract cleanly.
-    "inter", "montserrat", "poppins", "sourcesans", "sourceserif", "notosans",
-    "nunito", "raleway", "merriweather", "ptsans", "ptserif", "firasans",
-    "ibmplexsans", "ibmplexserif", "worksans", "rubik", "karla", "mulish",
-    "dejavu", "liberation", "nimbus", "jostpoppins", "publicsans",
+# The PDF base-14 faces. A viewer knows these without an embedded program, so
+# they need no ToUnicode map to extract correctly.
+_BASE_14 = (
+    "helvetica", "arial", "times", "courier", "symbol", "zapfdingbats",
 )
 
 # "  12  Built a service..." / "12\tBuilt..." / "12 | Built..."
@@ -60,32 +53,50 @@ def extract_text(pdf_file):
 # ---------------------------------------------------------------------------
 # PDF-level diagnostics (used by the Parsing Safety score)
 # ---------------------------------------------------------------------------
+_SAFE_ENCODINGS = ("/WinAnsiEncoding", "/MacRomanEncoding", "/StandardEncoding")
+
+
 def _fonts_are_standard(reader):
-    names = []
+    """Whether every font can be mapped back to characters.
+
+    An earlier version policed the typeface NAME against a list. That was
+    measuring the wrong thing twice over: it failed LaTeX and modern UI fonts
+    whose text extracts perfectly, and it passed documents where one unused
+    standard font sat alongside the real one.
+
+    A non-standard typeface is not a parsing problem - an embedded TTF reads
+    fine. What actually breaks extraction is an embedded font with no
+    ToUnicode map and no standard encoding, where glyphs cannot be resolved
+    back to characters and the text comes out as mojibake. Check for that.
+    """
+    fonts = []
     try:
         for page in reader.pages:
             res = page.get("/Resources")
             if not res:
                 continue
-            fonts = res.get_object().get("/Font")
-            if not fonts:
+            fd = res.get_object().get("/Font")
+            if not fd:
                 continue
-            for ref in fonts.get_object().values():
-                base = ref.get_object().get("/BaseFont")
-                if base:
-                    names.append(str(base))
+            for ref in fd.get_object().values():
+                fonts.append(ref.get_object())
     except Exception:
         return None  # can't tell -> omit the check instead of fake it
-    if not names:
+    if not fonts:
         return None
-    norm = [re.sub(r"^/?[A-Z]{6}\+", "", n).replace("/", "").replace("-", "").replace(" ", "").lower()
-            for n in names]
-    # Requiring EVERY font to be on the list failed any resume built in LaTeX
-    # (Latin Modern) or with a modern UI font, even though its text extracted
-    # perfectly. Judge the body instead: if most fonts are parser-safe, the
-    # document is parser-safe.
-    known = sum(1 for n in norm if any(std in n for std in _STANDARD_FONTS))
-    return (known / len(norm)) >= 0.5
+
+    for f in fonts:
+        base = str(f.get("/BaseFont") or "")
+        norm = (re.sub(r"^/?[A-Z]{6}\+", "", base)
+                .replace("/", "").replace("-", "").replace(" ", "").lower())
+        if any(std in norm for std in _BASE_14):
+            continue  # a built-in face; the viewer already knows its encoding
+        if f.get("/ToUnicode") is not None:
+            continue  # embedded, but carries a glyph-to-character map
+        if str(f.get("/Encoding") or "") in _SAFE_ENCODINGS:
+            continue
+        return False
+    return True
 
 
 def _has_images(reader):
@@ -165,6 +176,54 @@ def _looks_multi_column(text):
     return gapped / len(lines) > 0.35
 
 
+def _columns_from_layout(reader):
+    """Detect a two-column layout from where text actually sits on the page.
+
+    The text-gap test cannot see this case at all: PyPDF2 emits one column
+    then the other, so the extracted string has no wide gaps even though the
+    page clearly has two columns. Reading the x position of each text run
+    finds it - a two-column page has two tight clusters of left edges with a
+    real gutter between them, each carrying a substantial share of the lines.
+
+    Returns None when positions are unavailable, so the check is omitted
+    rather than guessed.
+    """
+    xs = []
+    try:
+        for page in reader.pages:
+            width = float(page.mediabox.width) or 595.0
+
+            def visitor(txt, cm, tm, font_dict, font_size, _xs=xs, _w=width):
+                if txt and txt.strip():
+                    _xs.append(tm[4] / _w)  # left edge as a fraction of width
+
+            page.extract_text(visitor_text=visitor)
+    except Exception:
+        return None
+    if len(xs) < 10:
+        return None
+
+    # Split at the widest gap between left edges rather than a fixed position:
+    # the gutter sits wherever the design put it, and a hardcoded midpoint
+    # misses a narrow left rail entirely.
+    uniq = sorted(set(round(x, 3) for x in xs))
+    if len(uniq) < 2:
+        return False
+    # Split at the midpoint of the gap, not at its lower edge - the edge came
+    # from a rounded value, so the unrounded positions all fall on one side.
+    gaps = [(uniq[i + 1] - uniq[i], (uniq[i] + uniq[i + 1]) / 2)
+            for i in range(len(uniq) - 1)]
+    gutter, split = max(gaps)
+    if gutter < 0.08:
+        return False  # indentation, not a column break
+
+    left = [x for x in xs if x <= split]
+    right = [x for x in xs if x > split]
+    # Both sides must carry a real share of the page; a right-aligned date on
+    # a handful of lines is not a column.
+    return min(len(left), len(right)) / len(xs) >= 0.25
+
+
 def analyze_pdf(pdf_file, text):
     """Return ATS-relevant structural facts about the PDF.
 
@@ -182,6 +241,11 @@ def analyze_pdf(pdf_file, text):
         pdf_file.seek(0)
         reader = PyPDF2.PdfReader(pdf_file)
         meta["font_is_standard"] = _fonts_are_standard(reader)
+        # Layout positions are the reliable signal; the text-gap heuristic is
+        # only a fallback for when they cannot be read.
+        by_layout = _columns_from_layout(reader)
+        if by_layout is not None:
+            meta["multi_column"] = by_layout
         has_img = _has_images(reader)
         meta["has_images"] = has_img
         # An image-heavy page with almost no extractable text == text locked in
