@@ -78,6 +78,52 @@ def _clamp01(v, default=0.0):
 
 _SIGNAL_LETTER = {"a": "number", "b": "technology", "c": "action", "d": "scope"}
 
+# Verbs that say what was actually built or changed. Deliberately excludes
+# "worked", "collaborated", "helped", "responsible for" and friends, which
+# describe presence rather than contribution.
+_CONCRETE_ACTION_RE = re.compile(
+    r"\b(built|created|implemented|designed|developed|engineered|architected|"
+    r"reduced|improved|optimi[sz]ed|scaled|migrated|deployed|automated|"
+    r"integrated|trained|refactored|launched|streamlined|eliminated|"
+    r"cut|increased|decreased|rebuilt|modelled|modeled|wrote|added|"
+    r"negotiated|led|mentored|chaired|organi[sz]ed|delivered)\b",
+    re.I,
+)
+
+# Scope means a stated size or boundary, so it needs a count attached to
+# something countable - "6 services", "across 42 stores", "a single instance".
+# "various projects" and "the team" are not scope.
+_SCOPE_EVIDENCE_RE = re.compile(
+    r"\b\d[\d,.]*\s*(?:\+|k|m)?\s*"
+    r"(?:users?|customers?|clients?|vendors?|students?|employees?|analysts?|"
+    r"services?|microservices?|instances?|servers?|nodes?|clusters?|regions?|"
+    r"stores?|teams?|domains?|endpoints?|apis?|tables?|records?|rows?|files?|"
+    r"feeds?|jobs?|pipelines?|tests?|pages?|documents?|repos?|repositories?|"
+    r"modules?|partitions?|connections?|attendees?|recruiters?|hubs?|"
+    r"verticals?|writers?|stages?|environments?)\b"
+    r"|\bacross\s+\d"
+    r"|\bsingle[\s-](?:instance|node|server|region)\b",
+    re.I,
+)
+
+
+def verify_action_signal(bullet):
+    return bool(_CONCRETE_ACTION_RE.search(bullet or ""))
+
+
+def verify_scope_signal(bullet):
+    return bool(_SCOPE_EVIDENCE_RE.search(bullet or ""))
+
+
+# Each signal the model claims is checked against the bullet itself. Technology
+# is left to the model: a name list can never be complete, and a wrong one
+# there costs a single signal rather than a whole band.
+_VERIFIERS = {
+    "number": lambda b: verify_number_signal(b),
+    "action": verify_action_signal,
+    "scope": verify_scope_signal,
+}
+
 
 def _norm_signals(sigs, bullet=None):
     """Map the model's noisy signal labels (letters, prose, or raw quoted
@@ -113,9 +159,11 @@ def _norm_signals(sigs, bullet=None):
             key = "action"
         else:
             continue  # unrecognised - drop instead of show noise
-        # Extra check: reject a claimed number signal that isn't a genuine
-        # metric (years, phone digits, tool version numbers).
-        if key == "number" and bullet is not None and not verify_number_signal(bullet):
+        # Verify the claim against the bullet. The model is generous with
+        # ACTION and SCOPE on filler text - it reads "Collaborated" as an
+        # action and "various projects" as scope, which scored
+        # "Collaborated with the team on various projects" at 0.60.
+        if bullet is not None and not _VERIFIERS.get(key, lambda _b: True)(bullet):
             continue
         if key not in out:
             out.append(key)
@@ -184,8 +232,11 @@ Return ONLY valid JSON (no markdown):
         score_h, sig_h = _score_bullet_heuristic(b)
         if "score" in lc:
             signals = _norm_signals(lc.get("signals_found") or lc.get("signals"), bullet=b) or sig_h
-            # Use the verified signal count, not the model's raw tally.
-            count = len(signals) if signals else lc.get("signal_count")
+            # Use the verified count only. Falling back to the model's own
+            # signal_count here undid the verification: a bullet whose every
+            # claimed signal failed its check still took the model's tally and
+            # landed a band or two too high.
+            count = len(signals)
             # Band-enforce against the model's own tally, then floor with the
             # heuristic so objective signals can never be under-scored.
             score = max(_enforce_band(_clamp01(lc.get("score"), 0.3), count), score_h)
@@ -281,14 +332,18 @@ _SCOPE_RE = re.compile(
 
 
 def _score_bullet_heuristic(text):
+    # Uses the same verifiers as the LLM path. They used to disagree - the
+    # heuristic counted looser action and scope matches, and because it acts as
+    # a floor it pulled filler like "Responsible for maintaining the codebase"
+    # up to 0.60 even after the LLM's signals were all rejected.
     signals = []
     if verify_number_signal(text):
         signals.append("number")
     if _TECH_RE.search(text):
         signals.append("technology")
-    if _ACTION_RE.search(text):
+    if verify_action_signal(text):
         signals.append("action")
-    if _SCOPE_RE.search(text):
+    if verify_scope_signal(text):
         signals.append("scope")
     n = len(signals)
     # Mid-point of each band from the rubric.
@@ -331,8 +386,10 @@ Return ONLY JSON:
     data = _llm_json(prompt)
     if isinstance(data, dict) and "score" in data:
         signals = _norm_signals(data.get("signals_found") or data.get("signals"), bullet=bullet)
-        # Band from the *verified* signal count, not the model's raw tally.
-        count = len(signals) if signals else data.get("signal_count")
+        # Band from the verified signal count alone. Falling back to the
+        # model's raw tally when verification rejected everything let filler
+        # keep the band its unchecked claims implied.
+        count = len(signals)
         score = _enforce_band(_clamp01(data.get("score"), 0.3), count)
         # Heuristic floor: never score below what objective signals prove.
         score_h, sig_h = _score_bullet_heuristic(bullet)

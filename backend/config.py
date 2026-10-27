@@ -31,7 +31,11 @@ class Config:
     # LLM_PROVIDER = "groq" | "gemini" | "mock"
     LLM_PROVIDER = os.getenv("LLM_PROVIDER", "mock").lower()
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-    GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+    # Groq retires models without notice and the API answers 404, which this
+    # client treats as a provider failure and silently falls back to the mock -
+    # so a dead model id looks like a working app producing template output.
+    # Check https://api.groq.com/openai/v1/models if generation goes generic.
+    GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
