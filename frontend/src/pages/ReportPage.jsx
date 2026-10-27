@@ -232,7 +232,11 @@ export default function ReportPage({ session, setSession }) {
 
 function ParsingSafety({ p, skills }) {
   const score = p.score ?? 0;
-  const tone = score >= 80 ? "good" : score >= 50 ? "mid" : "low";
+  const blocking = p.critical_failed || [];
+  // Keyed off the blocking failures, not the number. A critical failure is
+  // capped at 79, which would otherwise read as a mid amber score when it
+  // actually means an ATS cannot read part of the document.
+  const tone = blocking.length > 0 ? "low" : score >= 90 ? "good" : "mid";
   return (
     <div className="rep-block ats">
       <h2 className="rep-h">{p.label}</h2>
@@ -240,7 +244,7 @@ function ParsingSafety({ p, skills }) {
         <div className={`fit-ring fit-ring--${tone}`} style={{ "--pct": score }}>
           <div className="fit-ring-inner">
             <span className="score-big">{score}</span>
-            <span className="score-unit">parsing / 100</span>
+            <span className="score-unit">parse score</span>
           </div>
         </div>
         <div className="ats-meta">
@@ -249,8 +253,13 @@ function ParsingSafety({ p, skills }) {
             {p.contact?.name ? `Parsed as ${p.contact.name}. ` : ""}
             Sections detected: {(p.sections_found || []).join(", ") || "none"}.
           </p>
-          {p.critical_failed?.length > 0 && (
-            <p className="crit-note">Critical: {p.critical_failed.join(" | ")}</p>
+          {blocking.length > 0 ? (
+            <p className="crit-note">
+              {blocking.length === 1 ? "Blocking issue: " : "Blocking issues: "}
+              {blocking.join(", ")}
+            </p>
+          ) : (
+            <p className="ats-ok">No blocking issues found.</p>
           )}
         </div>
       </div>
@@ -258,12 +267,14 @@ function ParsingSafety({ p, skills }) {
       <div className="ats-checks">
         {(p.checks || []).map((c) => (
           <div key={c.name} className={`ats-check ats-check--${c.passed ? "pass" : (c.weight === "critical" ? "fail" : "warn")}`}>
-            <span className="ats-ic">{c.passed ? "yes" : (c.weight === "critical" ? "✕" : "!")}</span>
-            <span className="ats-label">
-              {c.name}
-              {c.weight === "critical" && <em className="crit-tag">critical</em>}
-            </span>
-            <span className="ats-detail">{c.detail}</span>
+            <span className="ats-ic" aria-hidden="true">{c.passed ? "✓" : (c.weight === "critical" ? "✕" : "!")}</span>
+            <div className="ats-check-body">
+              <span className="ats-label">
+                {c.name}
+                {c.weight === "critical" && !c.passed && <em className="crit-tag">blocking</em>}
+              </span>
+              <span className="ats-detail">{c.detail}</span>
+            </div>
           </div>
         ))}
       </div>

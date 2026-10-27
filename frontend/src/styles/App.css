@@ -927,20 +927,34 @@ html, body {
 
 .ats-checks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; }
 @media (max-width: 620px) { .ats-checks { grid-template-columns: 1fr; } }
-.ats-check { display: flex; align-items: baseline; gap: 9px; font-size: 13.5px; padding: 5px 0; }
+.ats-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13.5px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+}
+.ats-check:first-child, .ats-check:nth-child(2) { border-top: 0; }
+@media (max-width: 620px) { .ats-check:nth-child(2) { border-top: 1px solid var(--line); } }
+/* Label above detail, so a long explanation wraps under its own heading
+   instead of being squeezed onto one line inside a half-width column. */
+.ats-check-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .ats-ic {
   flex: none;
   width: 18px; height: 18px;
+  margin-top: 1px;
   display: grid; place-items: center;
   border-radius: 999px;
-  font-size: 10px; font-weight: 700;
+  font-size: 11px; font-weight: 700; line-height: 1;
   color: #fff;
 }
 .ats-check--pass .ats-ic { background: var(--good); }
 .ats-check--warn .ats-ic { background: var(--ochre); }
 .ats-check--fail .ats-ic { background: var(--brick); }
-.ats-label { flex: none; font-weight: 500; color: var(--ink); }
-.ats-detail { color: var(--ink-faint); font-weight: 300; font-size: 12.5px; }
+.ats-label { font-weight: 500; color: var(--ink); line-height: 1.35; }
+.ats-detail { color: var(--ink-faint); font-weight: 300; font-size: 12.5px; line-height: 1.45; }
+.ats-ok { color: var(--good); font-size: 13px; margin: 4px 0 0; }
 
 .crit-tag {
   font-style: normal;
