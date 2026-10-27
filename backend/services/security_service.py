@@ -62,6 +62,11 @@ def sanitize_untrusted(text, max_len=6000):
     cleaned = _HIDDEN_CHARS.sub("", text)
     cleaned = _INJECTION_RE.sub("[removed]", cleaned)
     # Stop the content from closing our own delimiters or faking chat roles.
+    # wrap_untrusted() fences this text in <LABEL_DATA> ... </LABEL_DATA>, so
+    # content carrying those tags can close the fence early and have whatever
+    # follows read as prompt rather than data. Neutralise them here instead of
+    # relying on the model to notice the block ended in the wrong place.
+    cleaned = re.sub(r"</?\s*[A-Za-z][A-Za-z0-9_]*_DATA\s*>", "[removed]", cleaned)
     cleaned = cleaned.replace('"""', "'''").replace("```", "'''")
     cleaned = re.sub(r"(?im)^\s*(system|assistant|user)\s*:", r"\1 -", cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
