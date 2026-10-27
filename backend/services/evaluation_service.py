@@ -9,6 +9,60 @@ import re
 
 from llm.client import client
 from services import security_service
+from services.analysis_service import verify_number_signal
+
+# The rubric's own bands, mirrored here so the code can hold the model to
+# them. Without this the model reported a signal count and then returned
+# whatever score it liked, so the same answer could score differently twice
+# and the number could contradict the feedback shown beside it.
+_ANSWER_BANDS = {0: (0.0, 0.1), 1: (0.2, 0.4), 2: (0.5, 0.7), 3: (0.8, 1.0), 4: (0.8, 1.0)}
+
+# "reasoning" means a decision explained, so look for the words that join a
+# choice to its cause. Technology and concrete detail stay the model's call -
+# no word list decides those, and a wrong one costs a single signal.
+_REASONING_RE = re.compile(
+    r"\b(because|since|so that|in order to|instead of|rather than|otherwise|"
+    r"trade[\s-]?off|the reason|which meant|that way|due to|as a result|"
+    r"we chose|i chose|we picked|i picked|avoids?|avoided)\b",
+    re.I,
+)
+
+_ANSWER_SIGNAL_LETTER = {"a": "number", "b": "technology", "c": "reasoning", "d": "detail"}
+
+
+def _norm_answer_signals(sigs, answer):
+    """Map the model's signal labels onto the rubric's four, dropping any it
+    cannot evidence in the answer itself."""
+    out = []
+    for s in sigs or []:
+        s = str(s).strip().lower()
+        if not s:
+            continue
+        m = re.match(r"^\(?([abcd])\)?[\s:.)-]*$", s)
+        if m:
+            key = _ANSWER_SIGNAL_LETTER[m.group(1)]
+        elif "number" in s or "metric" in s or "measur" in s or "quantif" in s:
+            key = "number"
+        elif "tech" in s or "tool" in s or "mechanism" in s or "technique" in s:
+            key = "technology"
+        elif "reason" in s or "why" in s or "tradeoff" in s or "trade-off" in s:
+            key = "reasoning"
+        elif "detail" in s or "specific" in s or "concrete" in s:
+            key = "detail"
+        else:
+            continue
+        if key == "number" and not verify_number_signal(answer):
+            continue
+        if key == "reasoning" and not _REASONING_RE.search(answer or ""):
+            continue
+        if key not in out:
+            out.append(key)
+    return out
+
+
+def _enforce_answer_band(score, count):
+    lo, hi = _ANSWER_BANDS.get(min(count, 4), (0.0, 1.0))
+    return max(lo, min(hi, score))
 
 
 def evaluate_answer(question, answer, source_chunk):
@@ -47,7 +101,11 @@ Return ONLY valid JSON:
     raw = client.generate(prompt) or ""
     data = _extract_json(raw)
     if isinstance(data, dict) and "score" in data:
-        score = _clamp01(data.get("score"), 0.3)
+        # Count the signals we can actually evidence, then hold the score to
+        # the band that count allows - the model's own number is an opinion.
+        signals = _norm_answer_signals(data.get("signals_found") or data.get("signals"),
+                                       safe_answer)
+        score = _enforce_answer_band(_clamp01(data.get("score"), 0.3), len(signals))
         reason = str(data.get("reason") or "").strip() or "Scored on the specificity rubric."
         improve = str(data.get("improve") or "").strip()
         return score, reason, improve
