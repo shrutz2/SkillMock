@@ -194,9 +194,23 @@ _SECTION_MAP = [
     ("education", re.compile(r"(?i)^education\s*:?\s*$")),
     ("certifications", re.compile(r"(?i)^(certifications?|achievements?|awards?|honou?rs?|accomplishments?)\s*:?\s*$")),
     ("summary", re.compile(r"(?i)^(summary|objective|profile|about\s*me?)\s*:?\s*$")),
+    # Non-engineering resumes lead with these. Unrecognised, a header is not a
+    # boundary at all, so everything under it is absorbed into the section
+    # above - an MBA's "Positions of Responsibility" bullets were being indexed
+    # and scored as work experience.
+    ("leadership", re.compile(
+        r"(?i)^(leadership|positions?\s+of\s+responsibility|por|"
+        r"extra[\s-]?curriculars?|co[\s-]?curriculars?|activities|"
+        r"volunteer(ing)?|community\s+(service|involvement))\s*:?\s*$")),
+    ("publications", re.compile(r"(?i)^(publications?|research|papers?|patents?)\s*:?\s*$")),
+    ("interests", re.compile(r"(?i)^(interests?|hobbies|languages?|coursework)\s*:?\s*$")),
 ]
 
-SCORABLE_SECTIONS = ("experience", "projects")
+# Sections whose bullets are indexed for retrieval and scored for claim
+# strength. Leadership belongs here: for a non-engineering candidate that is
+# where the substance lives, and those bullets carry numbers, actions and
+# scope just as experience bullets do.
+SCORABLE_SECTIONS = ("experience", "projects", "leadership")
 
 
 def _match_header(line):
@@ -246,7 +260,8 @@ def chunk_bullets(text):
             chunks.append(f"{name.capitalize()}: {bullet}")
 
     # Keep the non-bullet sections as whole chunks so they stay retrievable.
-    for name in ("skills", "summary", "certifications", "education"):
+    for name in ("skills", "summary", "certifications", "education",
+                 "publications", "interests"):
         lines = sections.get(name, [])
         joined = " ".join(ln.strip() for ln in lines).strip()
         if len(joined) >= _MIN_CHUNK_LEN:

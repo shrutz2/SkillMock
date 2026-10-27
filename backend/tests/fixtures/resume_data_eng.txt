@@ -1,0 +1,22 @@
+Rohit Nair
+rohit.nair@example.com | +91 90000 11223 | github.com/rohitnair
+
+Technical Skills
+Languages: Python, Scala, SQL
+Data: Spark, Airflow, dbt, Snowflake, Kafka, Delta Lake
+Cloud: AWS S3, Glue, EMR, Redshift, Terraform
+
+Work Experience
+Finlytics | Data Engineer | Mar 2022 - Present | Hyderabad
+- Rebuilt a nightly batch pipeline in Spark, cutting runtime from 6 hours to 48 minutes across 2.4 TB daily
+- Modelled 38 dbt tables with incremental materialisation, reducing Snowflake credit spend 41%
+- Implemented Great Expectations checks on 22 critical tables, catching 310 bad rows before downstream use
+
+Projects
+- Built a change-data-capture stream from Postgres to Delta Lake using Debezium and Kafka, handling 90k events/minute
+
+Certifications
+AWS Certified Data Analytics Specialty, 2023
+
+Education
+B.Tech, Information Technology | NIT Warangal | 2022 | CGPA 8.4/10
