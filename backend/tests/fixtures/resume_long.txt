@@ -1,0 +1,39 @@
+Priya Raghavan
+priya.raghavan@example.com | +91 99400 23781 | linkedin.com/in/priya-raghavan | github.com/praghavan
+
+Summary
+Backend engineer with three years building payment and data services in Python and Go.
+Most comfortable on reliability work: queues, caching, and the failure paths nobody tests.
+
+Skills
+Languages: Python, Go, SQL, TypeScript
+Frameworks: Django, FastAPI, gRPC, React
+Data: PostgreSQL, Redis, Kafka, Elasticsearch, ClickHouse
+Infra: Docker, Kubernetes, Terraform, AWS, GitHub Actions, Prometheus
+
+Experience
+Arcwell Payments | Backend Engineer | Aug 2023 - Present | Bengaluru
+- Cut checkout p99 latency from 1.8s to 420ms by replacing synchronous fraud scoring with a Kafka consumer and an idempotent settlement worker
+- Reduced PostgreSQL read load 62% by adding a Redis write-through cache on the merchant-config path, serving 14,000 lookups/minute at a 94% hit ratio
+- Eliminated duplicate refunds during a partial outage by introducing idempotency keys backed by a unique constraint, taking the weekly duplicate count from 37 to zero
+- Migrated 11 cron jobs to a Celery beat schedule with dead-letter retries, cutting silent job failures from roughly 9 per month to 1
+- Built a Prometheus and Grafana dashboard tracking latency percentiles and queue depth, which caught a slow memory leak in the settlement worker before it reached production
+
+Kestrel Analytics | Software Engineer | Jul 2022 - Aug 2023 | Chennai
+- Designed a ClickHouse schema with monthly partitions and a materialized rollup view, bringing a 40-second analytics query down to 900ms over 280 million rows
+- Automated nightly ingestion of 60 CSV feeds with Airflow, replacing a manual process that took an analyst about 4 hours each day
+- Added schema validation with Pydantic at the ingestion boundary, which rejected 1,200 malformed rows in the first week instead of silently corrupting reports
+- Wrote 84 unit and integration tests with pytest, raising branch coverage from 44% to 81% on the ingestion package
+
+Projects
+- Engineered a semantic search service over 120,000 documentation pages using sentence-transformer embeddings and a FAISS IVF index, returning top-10 matches in under 50ms
+- Built a distributed rate limiter in Go capping each API key at 500 requests/minute using Redis sliding-window counters across 4 instances
+- Implemented a Terraform module provisioning an isolated review environment per pull request, cutting manual QA setup from 25 minutes to 2
+- Wrote a static analyser that flags unparameterised SQL string concatenation, which found 23 injection-prone call sites in an internal codebase
+
+Certifications
+AWS Certified Solutions Architect Associate, 2024
+CKA Certified Kubernetes Administrator, 2023
+
+Education
+B.E., Computer Science | Anna University | 2022 | CGPA 8.9/10

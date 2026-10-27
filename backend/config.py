@@ -38,6 +38,10 @@ class Config:
     # --- Interview ---
     QUESTIONS_PER_SESSION = int(os.getenv("QUESTIONS_PER_SESSION", "10"))
     RETRIEVAL_TOP_K = int(os.getenv("RETRIEVAL_TOP_K", "3"))
+    # Retrieval unit: "bullet" (one chunk per accomplishment, ~20-40 per resume)
+    # or "section" (one chunk per section, ~5-8). Section chunks make a top-3
+    # search return most of the document, so bullet is the default.
+    CHUNK_GRANULARITY = os.getenv("CHUNK_GRANULARITY", "bullet").lower()
     MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "10"))
 
     # --- Security ---

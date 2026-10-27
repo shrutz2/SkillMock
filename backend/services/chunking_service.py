@@ -21,12 +21,41 @@ _SECTION_HEADERS = re.compile(
 )
 
 _MIN_CHUNK_LEN = 40
+# Below this, bullet chunking has not found enough to retrieve over and we fall
+# back to section chunks rather than indexing two or three fragments.
+_MIN_BULLET_CHUNKS = 6
 
 
-def chunk_resume(text):
-    """Return a list of coherent, non-trivial chunks."""
+def chunk_resume(text, granularity=None):
+    """Return a list of coherent, non-trivial chunks.
+
+    ``granularity`` picks the retrieval unit:
+
+    * ``"section"`` - one chunk per detected section. Yields ~5-8 chunks for a
+      typical resume, which means a top-3 search returns most of the document
+      and is barely selective.
+    * ``"bullet"`` - one chunk per accomplishment bullet, each prefixed with its
+      section name so the section context survives. Yields ~20-40 chunks, so
+      top-3 actually discriminates.
+
+    Defaults to ``Config.CHUNK_GRANULARITY``. Falls back to section chunks when
+    too few bullets are found (sparse or unusually formatted resumes).
+    """
     if not text or not text.strip():
         return []
+
+    if granularity is None:
+        try:
+            from config import Config
+            granularity = Config.CHUNK_GRANULARITY
+        except Exception:
+            granularity = "bullet"
+
+    if granularity == "bullet":
+        bullets = chunk_bullets(text)
+        if len(bullets) >= _MIN_BULLET_CHUNKS:
+            return bullets
+        # Not enough bullets to retrieve over - fall through to sections.
 
     lines = text.splitlines()
     chunks = []
@@ -194,6 +223,36 @@ def classify_sections(text):
             continue
         sections.setdefault(current, []).append(raw.rstrip())
     return sections
+
+
+def chunk_bullets(text):
+    """One chunk per bullet, prefixed with its section name.
+
+    The prefix matters: an embedded bullet on its own loses the fact that it
+    came from Experience rather than Projects, and that distinction changes
+    what a good interview question about it looks like.
+
+    Skills and Education carry no bullets but are still worth retrieving, so
+    they are kept whole as single chunks.
+    """
+    sections = classify_sections(text)
+    chunks = []
+
+    for name in SCORABLE_SECTIONS:
+        lines = sections.get(name, [])
+        if not lines:
+            continue
+        for bullet in extract_bullets("\n".join(lines)):
+            chunks.append(f"{name.capitalize()}: {bullet}")
+
+    # Keep the non-bullet sections as whole chunks so they stay retrievable.
+    for name in ("skills", "summary", "certifications", "education"):
+        lines = sections.get(name, [])
+        joined = " ".join(ln.strip() for ln in lines).strip()
+        if len(joined) >= _MIN_CHUNK_LEN:
+            chunks.append(f"{name.capitalize()}: {joined}")
+
+    return chunks
 
 
 def get_scorable_bullets(sections):
