@@ -84,9 +84,12 @@ _SIGNAL_LETTER = {"a": "number", "b": "technology", "c": "action", "d": "scope"}
 _CONCRETE_ACTION_RE = re.compile(
     r"\b(built|created|implemented|designed|developed|engineered|architected|"
     r"reduced|improved|optimi[sz]ed|scaled|migrated|deployed|automated|"
-    r"integrated|trained|refactored|launched|streamlined|eliminated|"
+    r"integrated|trained|refactored|launch(?:ed|ing)|streamlined|eliminated|"
     r"cut|increased|decreased|rebuilt|modelled|modeled|wrote|added|"
-    r"negotiated|led|mentored|chaired|organi[sz]ed|delivered)\b",
+    r"negotiated|led|mentored|chaired|organi[sz]ed|delivered|"
+    # Non-engineering resumes carry the same weight in different verbs.
+    r"grew|ran|conducted|oversaw|drove|established|introduced|raised|"
+    r"boosted|generated|secured|managed|analy[sz]ed|consolidated)\b",
     re.I,
 )
 
@@ -94,7 +97,10 @@ _CONCRETE_ACTION_RE = re.compile(
 # something countable - "6 services", "across 42 stores", "a single instance".
 # "various projects" and "the team" are not scope.
 _SCOPE_EVIDENCE_RE = re.compile(
-    r"\b\d[\d,.]*\s*(?:\+|k|m)?\s*"
+    # Up to two words may sit between the count and the thing counted -
+    # "25 landing pages", "6 regional hubs" - so allow them, but no more,
+    # or the number drifts far enough away to stop being that noun's count.
+    r"\b\d[\d,.]*\s*(?:\+|k|m)?\s*(?:[a-z-]+\s+){0,2}"
     r"(?:users?|customers?|clients?|vendors?|students?|employees?|analysts?|"
     r"services?|microservices?|instances?|servers?|nodes?|clusters?|regions?|"
     r"stores?|teams?|domains?|endpoints?|apis?|tables?|records?|rows?|files?|"
