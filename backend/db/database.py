@@ -180,6 +180,10 @@ def init_db():
         # Unguessable token proving ownership of a session. Session ids are
         # sequential, so the id alone must never grant access to the data.
         "ALTER TABLE sessions ADD COLUMN session_token VARCHAR(64)",
+        # The resume text as extracted from the PDF. The ATS report has to see
+        # the real document - section headers, the contact block, the layout -
+        # and reassembling it from retrieval chunks loses exactly those parts.
+        "ALTER TABLE sessions ADD COLUMN resume_text TEXT",
     ):
         try:
             cur.execute(stmt)

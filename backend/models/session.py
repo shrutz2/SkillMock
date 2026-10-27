@@ -7,18 +7,27 @@ from datetime import datetime, timedelta
 from db.database import execute
 
 
-def create(resume_filename, parse_meta=None, session_token=None):
+def create(resume_filename, parse_meta=None, session_token=None, resume_text=None):
     return execute(
-        """INSERT INTO sessions (resume_filename, created_at, parse_meta, session_token)
-           VALUES (%s, %s, %s, %s)""",
+        """INSERT INTO sessions
+             (resume_filename, created_at, parse_meta, session_token, resume_text)
+           VALUES (%s, %s, %s, %s, %s)""",
         (
             resume_filename,
             datetime.utcnow().isoformat(timespec="seconds"),
             json.dumps(parse_meta) if parse_meta is not None else None,
             session_token,
+            resume_text,
         ),
         commit=True,
     )
+
+
+def get_resume_text(session_id):
+    """The extracted resume text, or None for sessions created before it was
+    stored - callers fall back to reassembling it from chunks."""
+    row = get(session_id)
+    return (row or {}).get("resume_text") or None
 
 
 def new_token():

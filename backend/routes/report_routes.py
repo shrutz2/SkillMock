@@ -24,7 +24,15 @@ def resume_report():
     if not chunks:
         return jsonify({"error": "No resume content for this session"}), 404
 
-    resume_text = "\n".join(c["chunk_text"] for c in chunks)
+    # The ATS report must see the real document. Reassembling it from retrieval
+    # chunks drops whatever chunking did not keep - with bullet-level chunks
+    # that is the contact block and every section header, which then read as
+    # "no sections detected" and "no contact info" on a resume that parsed
+    # perfectly. Older sessions have no stored text, so they still fall back.
+    resume_text = (
+        session_model.get_resume_text(session_id)
+        or "\n".join(c["chunk_text"] for c in chunks)
+    )
 
     parse_meta = session_model.get_parse_meta(session_id)
     ats = ats_service.ats_report(resume_text, jd_text, parse_meta=parse_meta)

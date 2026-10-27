@@ -48,7 +48,10 @@ def upload_resume():
     parse_meta = resume_parser.analyze_pdf(file, text)
     token = session_model.new_token()
     session_id = session_model.create(
-        secure_filename(file.filename), parse_meta=parse_meta, session_token=token
+        secure_filename(file.filename),
+        parse_meta=parse_meta,
+        session_token=token,
+        resume_text=text,
     )
     faiss_index.build_index(session_id, embeddings)
 
