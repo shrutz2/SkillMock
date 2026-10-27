@@ -74,8 +74,19 @@ if __name__ == "__main__":
     wk = run("WEAK (expect < 0.3)", WEAK)
     bd = run("BORDERLINE (expect 0.3-0.7)", BORDER)
     print("\n--- CALIBRATION RESULT ---")
+    total = len(st) + len(wk) + len(bd)
+    # Without this the run silently mixes model scores with heuristic fallback
+    # scores and reports them as one number. A rate-limited free tier makes
+    # that the normal case, not an edge case.
+    from llm.client import client as _c
+    scored_by_llm = total - _c.fallbacks
     print("labelled examples: %d  (%d strong, %d weak, %d borderline)"
-          % (len(st) + len(wk) + len(bd), len(st), len(wk), len(bd)))
+          % (total, len(st), len(wk), len(bd)))
+    print("scored by the model: %d/%d%s"
+          % (scored_by_llm, total,
+             "" if not _c.fallbacks
+             else "   <-- %d fell back to the heuristic, so these averages "
+                  "are NOT pure model output" % _c.fallbacks))
     print("strong >= 0.7: %d/%d   (min %.2f, avg %.2f)"
           % (sum(x >= 0.7 for x in st), len(st), min(st), sum(st) / len(st)))
     print("weak   <  0.3: %d/%d   (max %.2f, avg %.2f)"
