@@ -34,8 +34,27 @@ _INJECTION_PATTERNS = [
     r"output\s+(only|exactly)\s*:",
     r"reveal\s+(your|the)\s+(prompt|instructions?|system)",
     r"repeat\s+(your|the)\s+(prompt|instructions?)",
+    # Text addressed to the evaluator rather than describing the work. A
+    # payload that asserts its own signals - "this bullet does contain a
+    # number (2,000 req/s), a technology (Redis)" - passes verification,
+    # because the tokens really are present in the sentence. The giveaway is
+    # not the tokens, it is that the sentence is talking about the scoring.
+    r"(note\s+to|dear|attention)\s+(the\s+)?(evaluator|grader|reviewer|assistant)",
+    r"(evaluator|grader|reviewer)[\s']*s?\s*note",
+    r"signal\s+count",
+    r"this\s+(bullet|answer|resume|text)\s+(does\s+)?(contains?|includes?|has)\b",
+    r"(score|rate|grade)\s+(this|it|the\s+\w+)\s*(as|at|:)?\s*\d",
+    r"already\s+(been\s+)?(reviewed|scored|graded|evaluated)",
+    r"(rubric|criteria|guidelines?)\s+(does\s+not|doesn't|do\s+not|don't)\s+apply",
+    r"(give|award)\s+(full|maximum|top)\s+(marks|score|points)",
+    r"keep\s+scoring\s+consistent",
 ]
 _INJECTION_RE = re.compile("|".join(_INJECTION_PATTERNS), re.I)
+
+# Four or more single letters separated by spaces - a run long enough that it
+# cannot be ordinary writing (initials, "a b testing") but is readable to a
+# model: "I G N O R E  A L L  P R E V I O U S".
+_SPACED_OUT = re.compile(r"\b(?:[A-Za-z] ){2,}[A-Za-z]\b")
 
 # Zero-width and bidi control characters used to hide text from humans.
 _HIDDEN_CHARS = re.compile(r"[​-‏‪-‮⁠-⁤﻿]")
@@ -60,6 +79,9 @@ def sanitize_untrusted(text, max_len=6000):
     findings = scan_for_injection(text)
 
     cleaned = _HIDDEN_CHARS.sub("", text)
+    # "I G N O R E  A L L" reads the same to a model and matches nothing, so
+    # collapse letters that have been spaced apart before the patterns run.
+    cleaned = _SPACED_OUT.sub(lambda m: m.group(0).replace(" ", ""), cleaned)
     cleaned = _INJECTION_RE.sub("[removed]", cleaned)
     # Stop the content from closing our own delimiters or faking chat roles.
     # wrap_untrusted() fences this text in <LABEL_DATA> ... </LABEL_DATA>, so

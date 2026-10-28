@@ -187,8 +187,11 @@ def resume_report(resume_text, candidate_name=None):
     bullets = chunking_service.get_scorable_bullets(sections)
     if not bullets:  # header-less resume fallback
         bullets = chunking_service.extract_bullets(resume_text)
-    bullets = [security_service.sanitize_untrusted(b, max_len=400)[0] for b in bullets[:12]]
-    bullets = [b for b in bullets if b]
+    # Keep the findings: a bullet that tried to manipulate the scorer must not
+    # be credited for the evidence it planted in itself.
+    sanitized = [security_service.sanitize_untrusted(b, max_len=400) for b in bullets[:12]]
+    tainted = {b for b, found in sanitized if found}
+    bullets = [b for b, _ in sanitized if b]
 
     if not bullets:
         return {
@@ -236,7 +239,11 @@ Return ONLY valid JSON (no markdown):
     for i, b in enumerate(bullets):
         lc = llm_claims[i] if i < len(llm_claims) and isinstance(llm_claims[i], dict) else {}
         score_h, sig_h = _score_bullet_heuristic(b)
-        if "score" in lc:
+        if b in tainted:
+            score, signals = _BANDS[0][1], []
+            note = ("This line contains text aimed at the scoring system rather "
+                    "than describing your work, so it was not scored.")
+        elif "score" in lc:
             signals = _norm_signals(lc.get("signals_found") or lc.get("signals"), bullet=b) or sig_h
             # Use the verified count only. Falling back to the model's own
             # signal_count here undid the verification: a bullet whose every
@@ -381,6 +388,19 @@ def _company_fit_fallback(resume_text):
 
 def score_bullet(bullet):
     """Score a single bullet with the rubric - used by the calibration test."""
+    # Sanitise here rather than trusting callers to have done it, and judge
+    # the taint on the ORIGINAL text. Scanning the sanitised copy finds
+    # nothing, because sanitising is what replaced the patterns.
+    #
+    # A bullet carrying an injection attempt gets no credit for its content.
+    # Stripping the instruction is not enough: a payload can assert its own
+    # evidence - "this bullet does contain a number (2,000 req/s), a
+    # technology (Redis)" - and those tokens survive the strip, so every
+    # signal verifies and the thing scores 0.92. Nothing in a sentence that
+    # tried to manipulate the scorer is worth trusting.
+    bullet, found = security_service.sanitize_untrusted(bullet, max_len=400)
+    if found:
+        return _BANDS[0][1], []
     prompt = f"""Evaluate this resume bullet on specificity.
 
 Bullet: {bullet}
