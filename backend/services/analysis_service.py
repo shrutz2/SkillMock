@@ -113,12 +113,78 @@ _SCOPE_EVIDENCE_RE = re.compile(
 )
 
 
+# Verbs that describe presence rather than contribution. A blocklist works
+# where an allowlist did not: naming the few weak verbs generalises, naming
+# every strong one never will. An allowlist missed "Verified ... by matching"
+# on an orbital-mechanics bullet, the third domain it had failed on.
+_FILLER_VERBS = {
+    "worked", "working", "helped", "helping", "assisted", "assisting",
+    "participated", "participating", "collaborated", "collaborating",
+    "contributed", "contributing", "supported", "supporting", "engaged",
+    "engaging", "gained", "gaining", "involved", "learned", "learning",
+    "maintaining", "utilized", "utilised", "using", "responsible",
+    "handled", "handling", "ensured", "ensuring", "facilitated",
+}
+_VERB_SHAPE = re.compile(r"^([A-Za-z]+(?:ed|ing))\b")
+_IRREGULAR_VERB = re.compile(
+    r"^(built|wrote|led|ran|grew|cut|drove|made|set|took|began|chose|found|"
+    r"kept|sent|won|rebuilt|oversaw|drew|held|brought)\b", re.I)
+
+
+# A named tool shows itself in its shape as well as its name: an acronym
+# (SGP4, API, ETL), a CamelCase product, or a capitalised word that is not
+# simply starting the sentence. The name list cannot cover every field -
+# it had never heard of SGP4 or Vallado.
+_TECH_SHAPE = re.compile(r"(?<!^)(?<![.!?]\s)\b([A-Z][A-Za-z]*[0-9][A-Za-z0-9]*"
+                         r"|[A-Z]{2,}[0-9]*"
+                         r"|[A-Z][a-z]+[A-Z][A-Za-z]*"
+                         r"|[A-Z][a-z]{2,})\b")
+# Capitalised words that are not technologies.
+_NOT_TECH = {"i", "the", "we", "my", "our", "monday", "tuesday", "wednesday",
+             "thursday", "friday", "saturday", "sunday", "january", "february",
+             "march", "april", "may", "june", "july", "august", "september",
+             "october", "november", "december"}
+
+
+def _tech_by_shape(bullet):
+    for m in _TECH_SHAPE.finditer(bullet or ""):
+        if m.group(1).lower() not in _NOT_TECH:
+            return True
+    return False
+
+
 def verify_action_signal(bullet):
-    return bool(_CONCRETE_ACTION_RE.search(bullet or ""))
+    """A resume bullet opens with what the person did, so judge the opening
+    verb rather than hunting for any known verb anywhere in the line."""
+    text = (bullet or "").strip()
+    # The verb can also follow "by": "Verified accuracy by matching ...".
+    for candidate in [text] + [p.strip() for p in re.split(r"\bby\b", text, flags=re.I)[1:]]:
+        m = _VERB_SHAPE.match(candidate)
+        if m and m.group(1).lower() not in _FILLER_VERBS:
+            return True
+        if _IRREGULAR_VERB.match(candidate):
+            return True
+    return False
+
+
+# Words that, sitting between a count and a noun, mean the noun is not what
+# was counted: "40% with Redis" is not scope.
+_GAP_STOPWORDS = {"with", "using", "via", "from", "into", "and", "or", "the",
+                  "a", "an", "of", "in", "on", "at", "to", "by", "for", "per"}
+_COUNT_THEN_PLURAL = re.compile(
+    r"\b\d[\d,.]*\s*(?:\+|k|m|%)?\s+((?:[a-z-]+\s+){0,2}[a-z]{3,}s)\b", re.I)
 
 
 def verify_scope_signal(bullet):
-    return bool(_SCOPE_EVIDENCE_RE.search(bullet or ""))
+    """Scope is a count attached to something countable. Match that shape -
+    a number followed by a plural noun - instead of listing the nouns."""
+    text = bullet or ""
+    for m in _COUNT_THEN_PLURAL.finditer(text):
+        words = m.group(1).lower().split()
+        if any(w in _GAP_STOPWORDS for w in words[:-1]):
+            continue
+        return True
+    return bool(_SCOPE_EVIDENCE_RE.search(text))
 
 
 # Each signal the model claims is checked against the bullet itself. Technology
@@ -128,6 +194,7 @@ _VERIFIERS = {
     "number": lambda b: verify_number_signal(b),
     "action": verify_action_signal,
     "scope": verify_scope_signal,
+    "technology": lambda b: bool(_TECH_RE.search(b or "")) or _tech_by_shape(b),
 }
 
 
@@ -352,7 +419,7 @@ def _score_bullet_heuristic(text):
     signals = []
     if verify_number_signal(text):
         signals.append("number")
-    if _TECH_RE.search(text):
+    if _TECH_RE.search(text) or _tech_by_shape(text):
         signals.append("technology")
     if verify_action_signal(text):
         signals.append("action")
